@@ -8,10 +8,12 @@ const int NUM_STRINGS = 6;
 // Connect buttons to these pins and ground. We will use internal pull-up resistors.
 const int stringPins[NUM_STRINGS] = {2, 3, 4, 5, 6, 7}; 
 
+// MIDI note for each open string, matched 1:1 with stringPins
+// Standard tuning low to high: E2, A2, D3, G3, B3, E4
+const int openStringNotes[NUM_STRINGS] = {40, 45, 50, 55, 59, 64};
+
 // Track the state of each string button
 int lastStringState[NUM_STRINGS] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
-
-// TODO: Initialize note playing logic
 
 // Track currently playing notes so we can send correct "Note Off" commands
 int currentlyPlayingNotes[NUM_STRINGS] = {-1, -1, -1, -1, -1, -1};
@@ -46,8 +48,17 @@ void loop() {
   // Loop through string buttons and playNotes(string_button_press, activeFret)
   for (int s = 0; s < NUM_STRINGS; s++) {
     int currentState = digitalRead(stringPins[s]);
-    
     if (currentState == LOW && lastStringState[s] == HIGH) {
+      int note = openStringNotes[s] + activeFret;
+
+      // If a previous note was still ringing on this string, kill it first
+      if (currentlyPlayingNotes[s] != -1) {
+        serialNoteOff(currentlyPlayingNotes[s]);
+      }
+
+      serialNoteOn(note);
+      currentlyPlayingNotes[s] = note;
+
     
     // TODO: Note playing logic
     // Concept: Send serial data that note is on so computer can play it
@@ -56,21 +67,18 @@ void loop() {
     } 
     // Check for button release
     else if (currentState == HIGH && lastStringState[s] == LOW) {
-      
-      // Send Note Off for the specific note that was playing on this string
       if (currentlyPlayingNotes[s] != -1) {
-
-        //TODO: serialNoteOff()
-
-        currentlyPlayingNotes[s] = -1; // Reset playing state
+        serialNoteOff(currentlyPlayingNotes[s]);
+        currentlyPlayingNotes[s] = -1;
       }
-      
+
       delay(5); // Tiny debounce delay
     }
-    
+
     lastStringState[s] = currentState;
   }
 }
+
 
 //Returns highest fret currently being touched
 int getHighestFret(uint16_t touchedData) {
@@ -81,6 +89,12 @@ int getHighestFret(uint16_t touchedData) {
     }
     return 0;
 }
+void serialNoteOn(int note) {
+  Serial.print("ON,");
+  Serial.println(note);
+}
 
-void serialNoteOn(){}
-void serialNoteOff(){}
+void serialNoteOff(int note) {
+  Serial.print("OFF,");
+  Serial.println(note);
+}
